@@ -1,5 +1,4 @@
 // MonomeClient.sc
-// v.0.0
 
 // sort-of analogous to MIDIClient / MIDIResponder
 // however, MonomeClient and MonomeResponder are more agnostic concerning message type.
@@ -21,50 +20,263 @@
 // TODO:
 // cmd-.
 
-
-// 
-
+// FIXME: threadsafe pinging
 
 //------ MonomeClient
 // singleton class
 // manages device list, handles incoming OSC, calls MonomeResponders
 MonomeClient {
 	// devices on file
-	// dictionary class: \id->MonomeDevice	classvar <devices;
+	// dictionary class: \id->MonomeDevice
+	classvar <devices;
 	// active connections:
-	// tree class: \device->MonomeDevice, 	classvar <connections;	// oneshot responders for pinging	classvar <osr;	// MonomeResponders	classvar <>responders;	// runtime
-	classvar <responderCount;	classvar ping;	///// debug	classvar <>debug = false;	classvar <>dum = 0;		*initClass {		devices = Dictionary.new;		connections = MultiLevelIdentityDictionary.new;		osr = MultiLevelIdentityDictionary.new;		responders = List.new;		responderCount = 0;		ping = false;	}		// rebuild the device list (from .conf files)	*scanDevices {		var confs;		devices.clear;		confs = Platform.case(			\osx, { PathName.new("~/Library/Preferences/org.monome.serialosc/").files },			\linux, { PathName.new("~/.conf/serialosc/").files },			\windows, { "TODO: windows .conf location".postln; nil } 		);		confs.do({ arg path; this.prScanConfFile(path) });		if (debug) {devices.do({ |dev| dev.dump; }); }	}		// search for a particular device  (in .conf files)	*scanDevice {arg id;   		var ok = false;		var path;				devices.clear;		path = PathName(Platform.case(			\osx, { "~/Library/Preferences/org.monome.serialosc/" },			\linux, { "~/.conf/serialosc/" },			\windows, { "TODO: windows .conf location".postln; nil } 		) ++ id ++ ".conf");				^(this.prScanConfFile(path));	}		// ping a particular device, add it to connections list if successful	*connectDevice { arg id, doneAction, wait=0.1, steal=true;
-		var addr = devices[id].serverAddr;		MonomeProtocol.systemServerStatusPatterns.do({			arg pat;			// oneshot responder			osr.put(				id,			// this device				pat.key,		// osc from systemServer				OSCresponderNode(					addr,					pat.key,					{	arg t, r, msg;						if ( (msg[0] == '/sys/port'), {							if (devices[id].stolen == false, {
+	// tree class: \device->MonomeDevice, 
+	classvar <connections;
+	// oneshot responders for pinging
+	classvar <osr;
+	// MonomeResponders
+	classvar <>responders;
+	// functions for dealing with port/prefix focus
+	classvar <>lostPortFunction;
+	classvar <>lostPrefixFunction;
+	// runtime
+	classvar <responderCount;
+	classvar ping; // FIXME
+	///// debug
+	classvar <>debug = false;
+	classvar <>dum = 0;
+	
+	*initClass {
+		devices = Dictionary.new;
+		connections = MultiLevelIdentityDictionary.new;
+		osr = MultiLevelIdentityDictionary.new;
+		responders = List.new;
+		responderCount = 0;
+		ping = false;
+		lostPortFunction = { arg id; postln("MonomeClient: lost port: "++id); };
+		lostPrefixFunction = { arg id; postln("MonomeClient: lost prefix: "++id); };
+	}
+	
+	// rebuild the device list (from .conf files)
+	*scanDevices {
+		var confs;
+		devices.clear;
+		confs = Platform.case(
+			\osx, { PathName.new("~/Library/Preferences/org.monome.serialosc/").files },
+			\linux, { PathName.new("~/.conf/serialosc/").files },
+			\windows, { "TODO: windows .conf location".postln; nil } 
+		);
+		confs.do({ arg path; this.prScanConfFile(path) });
+		if (debug) {devices.do({ |dev| dev.dump; }); }
+	}
+	
+	// search for a particular device  (in .conf files)
+	*scanDevice {arg id;   
+		var ok = false;
+		var path;
+		
+		devices.clear;
+		path = PathName(Platform.case(
+			\osx, { "~/Library/Preferences/org.monome.serialosc/" },
+			\linux, { "~/.conf/serialosc/" },
+			\windows, { "TODO: windows .conf location".postln; nil } 
+		) ++ id ++ ".conf");
+		
+		^(this.prScanConfFile(path));
+	}
+
+	
+	// ping a particular device, add it to connections list if successful
+	// by default, this also steals the device's port
+	*connectDevice { arg id, doneAction, wait=0.1, steal=true;
+		var addr = devices[id].serverAddr;
+		connections.put(id, \device, `(devices[id]));
+		MonomeProtocol.systemServerStatusPatterns.do({
+			arg pat;
+			// oneshot responder
+			osr.put(
+				id,			// this device
+				pat.key,		// osc from systemServer
+				OSCresponderNode(
+					addr,
+					pat.key,
+					{	arg t, r, msg;
+
+						if ( (msg[0] == '/sys/port'), {
+							if (devices[id].portStolen == false, {
 								devices[id].data[\savedPort] = msg[1];
-							});						});												devices[id].data[pat.key] = msg.copyRange(1, msg.size);						if(debug, { postln("got ping: "++ (id ++ msg)); });						osr[id][pat.key].remove;					} 				).add;			);		});				// send info request; each osr should get a ping shortly		addr.sendMsg('/sys/info', NetAddr.langPort);		// check on the results in the future		Routine {			var pingOk = true;			wait.wait;			MonomeProtocol.systemServerStatusPatterns.do({				arg pat;				pingOk = pingOk && (devices[id].data[pat.key].notNil);			});			devices[id].connected = pingOk;			if(steal, {				this.stealDevicePort(id);			}, {				this.restoreDevicePort(id);			});			doneAction.value(id, pingOk);		}.play;	}		// run connection routine for all devices on file	*connectAllDevices { arg doneAction, wait=0.05, steal=true;		var pingCondition = Dictionary.new;		devices.do({ arg dev; pingCondition[dev.id] = Condition.new(false); });		devices.do({arg dev;			this.connectDevice(dev.id, {				pingCondition[dev.id].test = true;				pingCondition[dev.id].signal;			}, wait, steal);			});			Routine {			pingCondition.do({ arg con; con.wait; });			doneAction.value;		}.play;	}			// send port change request to device, thus stealing focus from other apps	*stealDevicePort { arg id, doneAction, wait=0.05;		var addr = devices[id].serverAddr;
-		// send port change request		addr.sendMsg('/sys/port', NetAddr.langPort);		ping = false;
-		// ping to confirm 		osr.put(			id,			'/sys/port',			OSCresponderNode(				addr,				'/sys/port',				{	arg t, r, msg;					ping = (msg[1] == NetAddr.langPort);				} 			).add;		);		Routine {			wait.wait;			if(ping, {				this.prAddRespondersAtDevice(id);
-				devices[id].stolen = true;
-				doneAction.value(id, true);			}, {
-				doneAction.value(id, false);
-			});		}.play;	}		// kill OSC responders on a device connection, reset server's destination port	*restoreDevicePort { arg id;
-		connections[id].postln;
-		devices[id].data['savedPort'].postln;
-		if(connections[id].notNil, {
-			this.prRemoveRespondersAtDevice(id);
-			devices[id].serverAddr.sendMsg('/sys/port', devices[id].data['savedPort']);
-			devices[id].stolen = false;
+							});
+						});
+						
+						if ( (msg[0] == '/sys/prefix'), {
+							if (devices[id].prefixStolen == false, {
+								devices[id].data[\savedPrefix] = msg[1];
+							});
+						});
+						
+						devices[id].data[pat.key] = msg.copyRange(1, msg.size);
+						if(debug, { postln("got ping: "++ (id ++ msg)); });
+						osr[id][pat.key].remove;
+					} 
+				).add;
+			);
 		});
-	}	
-	// same for all devices	*restoreAllDevicePorts {
+		
+		// send info request; each osr should get a ping shortly
+		addr.sendMsg('/sys/info', NetAddr.langPort);
+		// check on the results in the future
+		Routine {
+			var pingOk = true;
+			wait.wait;
+			MonomeProtocol.systemServerStatusPatterns.do({
+				arg pat;
+				pingOk = pingOk && (devices[id].data[pat.key].notNil);
+			});
+			devices[id].connected = pingOk;
+			if(steal, {
+				this.stealDevicePort(id);
+			}, {
+				this.restoreDevicePort(id);
+			});
+			doneAction.value(id, pingOk);
+		}.play;
+
+	}
+	
+	// run connection routine for all devices on file
+	// by default, this doesn't steal their port settings
+	*connectAllDevices { arg doneAction, wait=0.05, steal=false;
+		var pingCondition = Dictionary.new;
+		devices.do({ arg dev; pingCondition[dev.id] = Condition.new(false); });
+		devices.do({arg dev;
+			this.connectDevice(dev.id, {
+				pingCondition[dev.id].test = true;
+				pingCondition[dev.id].signal;
+			}, wait, steal);	
+		});	
+		Routine {
+			pingCondition.do({ arg con; con.wait; });
+			doneAction.value;
+		}.play;
+	}
+	
+	// destroy a device's responders, restore its port and prefix settings
+	*disconnectDevice { arg id;
+		if(connections[id].notNil, {
+			// trash the OSC responders and other connection data
+			this.prRemoveRespondersForDevice(id);
+			connections.removeEmptyAt(id, \device);
+			this.restoreDevicePort(id);
+			this.restorePrefix(id);
+			devices[id].portStolen = false;
+			devices[id].portStolen = false;
+		});
+	}
+	
+	// same for all devices
+	*disconnecAllDevices {
+		var id;
+		devices.do({ arg dev;
+			id = dev.id;
+			this.disconnectDevice(id);		
+		});
+	}
+	
+	// send port change request to device, thus stealing focus from other apps
+	*stealDevicePort { arg id, doneAction, wait=0.05;
+		var addr = devices[id].serverAddr;
+		addr.sendMsg('/sys/port', NetAddr.langPort);
+		ping = false;
+		// ping to confirm 
+		osr.put(
+			id,
+			'/sys/port',
+			OSCresponderNode(
+				addr,
+				'/sys/port',
+				{	arg t, r, msg;
+					ping = (msg[1] == NetAddr.langPort);
+				} 
+			).add;
+		);
+		Routine {
+			wait.wait;
+			if(ping, {
+				this.prAddRespondersAtDevice(id);
+				devices[id].portStolen = true;
+				doneAction.value(id, true);
+			}, {
+				doneAction.value(id, false);
+			});
+		}.play;
+	}
+	
+	// reset a monome server's destination port
+	*restoreDevicePort { arg id;
+		devices[id].serverAddr.sendMsg('/sys/port', devices[id].data['savedPort']);
+		devices[id].portStolen = false;
+
+	}
+	// convenience: all devices
+	*restoreAllDevicePorts {
 		connections.do({ arg dat;
-			this.prRemoveRespondersAtDevice(dat[\device].value.id);
-			dat[\device].value.serverAddr.sendMsg('/sys/port', dat[\device].value.data['savedPort']);
-			dat[\focus] = false;
-		});	}		// send to device by ID
-	// will attempt to send to an unconnected device	*msgDevice { arg id, cmd ... args; 		devices[id].serverAddr.sendBundle(			0.0, [devices[id].data['/sys/prefix'][0] ++ cmd] ++ args		);	}		// send to all connected devices	*msgAllDevices { arg cmd ... args; 		connections.do({ arg dat;
-			dat[\device].value.serverAddr.sendBundle(				0.0, [dat[\device].value.data['/sys/prefix'][0] ++ cmd] ++ args			);		});	}		// store a reference to a MonomeResponder	*addResponder { arg mr, priority, name;		responders.add((\responder:`mr, \priority:priority, \name:name, \tag:responderCount)); 		responders = responders.sortBy(\priority);		mr.tag = responderCount;		responderCount = responderCount + 1;	}
+			restoreDevicePort(dat.value.id);
+		});
+	}
+	
+	// reset a monome server's prefix
+	*restoreDevicePrefix { arg id;
+		devices[id].serverAddr.sendMsg('/sys/prefix', devices[id].data['savedPrefix']);
+		devices[id].portStolen = false;
+	}
+	
+	// convenience: all devices
+	*restoreAllDevicePrefixes {
+		connections.do({ arg dat;
+			restoreDevicePrefix(dat.value.id);
+		});
+	}
+	
+	// send to device by ID
+	// will attempt to send to an unconnected device
+	*msgDevice { arg id, cmd ... args; 
+		if (MonomeProtocol.systemClientPatterns.collect({|pat|pat.key}).matchItem(cmd), {
+			devices[id].serverAddr.sendBundle(0.0, [cmd] ++ args);
+		}, {
+			devices[id].serverAddr.sendBundle(0.0, [devices[id].data['/sys/prefix'][0].asString ++ cmd] ++ args);
+		});
+	}
+	
+	// send to all connected devices
+	*msgAllDevices { arg cmd ... args; 
+		if (MonomeProtocol.systemClientPatterns.collect({|pat|pat.key}).matchItem(cmd), {
+			connections.do({ arg dat;
+				dat[\device].value.serverAddr.sendBundle(0.0, [dat[\device].value.data['/sys/prefix'][0] ++ cmd] ++ args);
+			});
+		}, {
+			connections.do({ arg dat;
+				dat[\device].value.serverAddr.sendBundle(0.0, [cmd] ++ args);
+			});
+		});
+	}
+	
+	// store a reference to a MonomeResponder
+	*addResponder { arg mr, priority, name;
+		responders.add((\responder:`mr, \priority:priority, \name:name, \tag:responderCount)); 
+		responders = responders.sortBy(\priority);
+		mr.tag = responderCount;
+		responderCount = responderCount + 1;
+	}
 	
 	*getConnectedDevices {
+		// FIXME: this returns ref's to MonomeDevices!
+		// otherwise we get the data by copy and can't affect anything!
+		// this is a confusing workaround and there's got to be a better way...
+	//	^(connections.collect({arg dat; dat[\device]}));
 		^(connections.collect({arg dat; dat[\device].value}));
 	}
 
-	// just ping the device and refresh 
+	// ping a device, update its data, evaluate a doneAction on success
 	*refreshDeviceInfo { arg id, wait=0.01, doneAction;
 		var addr = devices[id].serverAddr;
 		var dat = Event.new;
@@ -97,17 +309,152 @@ MonomeClient {
 
 			doneAction.value(id, dat);
 		}.play;
-	}			///////////////////////////////////////////////////	///-------------  private methods -----------------		// build OSC responder list for device	*prAddRespondersAtDevice { arg id;		var addr;		connections.put(id, \device, `(devices[id]));	// store a reference to the device data		connections.put(id, \focus, false);			// has SC stolen focus with a port request		addr = devices[id].serverAddr;
+	}
+	
+	// set device prefix, evaluate a doneAction on success
+	*setDevicePrefix {arg id, str, doneAction, wait=0.05;
+		var addr = devices[id].serverAddr;
+		// send port change request
+		addr.sendMsg('/sys/prefix', str.asSymbol);
+		ping = false;
+		// ping to confirm 
+		osr.put(
+			id,
+			'/sys/prefix',
+			OSCresponderNode(
+				addr,
+				'/sys/prefix',
+				{	arg t, r, msg;
+					ping = (msg[1].asString == str);
+				} 
+			).add;
+		);
+		Routine {
+			wait.wait;
+			doneAction.value(id, ping);
+			if(ping, {		
+				devices[id].data['/sys/prefix'][0] = str.asSymbol;
+				// irritatingly, OSCresponderNode (unlike OSCresponder)
+				// cannot change its cmdName on the fly.
+				// so (unless we want to steal all OSC traffic for monome commands),
+				// we must destroy all this device's responderNodes, and make new ones... ugh
+				this.prRemoveRespondersAtDevice(id);
+				this.prAddRespondersAtDevice(id);
+			});
+		}.play;
+	}
+	
+	///////////////////////////////////////////////////
+	///-------------  private methods -----------------
+	
+	// build OSC responder list for device
+	*prAddRespondersAtDevice { arg id;
+		var addr;
+		addr = devices[id].serverAddr;
 		MonomeProtocol.deviceServerPatterns.do({
 			arg pat;
 			var sym;
-			sym = (devices[id].data['/sys/prefix'][0].asString ++ pat.key).asSymbol;			// postln([pat, id, sym, devices[id], devices[id].data]);			connections.put(id, \responders, pat.key, 				OSCresponderNode(addr, sym, {					arg t, oscr, msg;					var event, ate;					// make an event, pass it to MonomeResponders,					// break if it gets eaten (returning the MonomeResponder that ate it)					block { |break| 						ate = false;						event = (								\time	: t,							\id 		: id,							\host	: devices[id].data['/sys/host'][0],							\port 	: devices[id].serverAddr.port,							\prefix	: devices[id].data['/sys/prefix'][0],							\cmd		: pat.key,							\a		: msg[1],							\b		: msg[2],							\c		: msg[3],							\d		: msg[4]						);						// ("\n"++ event ++ "\n" ++ dum ++ "\n").postln; dum = dum + 1;						responders.collect({|dat| dat.responder}).do({ arg mrRef;							if (mrRef.value.active, {								ate = mrRef.value.respond(event);							});							if(ate, { break.value(mrRef.value); });						});					} // block				}).add;			);		});	}		// trash OSC responder list for device	*prRemoveRespondersAtDevice { arg id;		MonomeProtocol.deviceServerPatterns.do({ arg pat;			connections.removeEmptyAt(id, \responders, pat.key);		});			connections.removeEmptyAt(id, \device);	}		// process a .conf file	*prScanConfFile { arg path;		var file;
+			sym = (devices[id].data['/sys/prefix'][0].asString ++ pat.key).asSymbol;
+			// postln([pat, id, sym, devices[id], devices[id].data]);
+			connections.put(id, \responders, pat.key, 
+				OSCresponderNode(addr, sym, {
+					arg t, oscr, msg;
+					var event, ate;
+					// make an event, pass it to MonomeResponders,
+					// break if it gets eaten (returning the MonomeResponder that ate it)
+					block { |break| 
+						ate = false;
+						event = (	
+							\time	: t,
+							\id 		: id,
+							\host	: devices[id].data['/sys/host'][0],
+							\port 	: devices[id].serverAddr.port,
+							\prefix	: devices[id].data['/sys/prefix'][0],
+							\cmd		: pat.key,
+							\a		: msg[1],
+							\b		: msg[2],
+							\c		: msg[3],
+							\d		: msg[4]
+						);
+						// ("\n"++ event ++ "\n" ++ dum ++ "\n").postln; dum = dum + 1;
+						responders.collect({|dat| dat.responder}).do({ arg mrRef;
+							if (mrRef.value.active, {
+								ate = mrRef.value.respond(event);
+							});
+							if(ate, { break.value(mrRef.value); });
+						});
+					} // block
+				}).add;
+			);
+
+		});
+		// add special responders for port and prefix changes
+		connections.put(id, \responders, '/sys/port', 
+			OSCresponderNode(addr, '/sys/port', {
+				arg t, oscr, msg;
+				if(devices[id].portStolen, {
+					if(msg[1] != NetAddr.langPort, {
+						devices[id].portStolen = false;
+						lostPortFunction.value(id);
+					});	
+				});
+			}).add;
+		);
+		connections.put(id, \responders, '/sys/prefix', 
+			OSCresponderNode(addr, '/sys/prefix', {
+				arg t, oscr, msg;
+				if(devices[id].portStolen, {
+					if(msg[1] != devices[id].data['/sys/prefix'][0], {
+						devices[id].prefixStolen = false;
+						this.prRemoveRespondersAtDevice(id);
+						this.prAddRespondersAtDevice(id);
+						lostPrefixFunction.value(id);
+					});	
+				});
+			}).add;
+		);
+	}
+	
+	*prRemoveRespondersAtDevice { arg id;		
+		MonomeProtocol.deviceServerPatterns.do({ arg pat;
+			connections.removeEmptyAt(id, \responders, pat.key);
+		});	
+		connections.removeEmptyAt(id, \responders, '/sys/port');
+		connections.removeEmptyAt(id, \responders, '/sys/prefix');
+	}
+
+	// process a .conf file
+	*prScanConfFile { arg path;
+		var file;
 		path.asAbsolutePath.postln;
-		if  (File.exists(path.absolutePath), { 			var str, i, port, id, ok;
-			file = File.new(path.asAbsolutePath, "r");			ok = true;			str = file.readAllString;			/// scan for server port			i = 0;			i = str.find("server", true, i);			ok = ok && i.notNil;			i = str.find("port", true, i);			ok = ok && i.notNil;			i = str.find("=", true, i);			ok = ok && i.notNil;			port = str.copyRange(i+1, str.find("\n", true, i) - 1).asInteger;
-						// id from the path			id = path.fileNameWithoutExtension.asSymbol;			// make a monome device data entry. 			devices[id] = MonomeDevice.new;			devices[id].data.add('/sys/id'-> [id]);
+		if  (File.exists(path.absolutePath), { 
+			var str, i, port, id, ok;
+			file = File.new(path.asAbsolutePath, "r");
+			ok = true;
+			str = file.readAllString;
+			/// scan for server port
+			i = 0;
+			i = str.find("server", true, i);
+			ok = ok && i.notNil;
+			i = str.find("port", true, i);
+			ok = ok && i.notNil;
+			i = str.find("=", true, i);
+			ok = ok && i.notNil;
+			port = str.copyRange(i+1, str.find("\n", true, i) - 1).asInteger;
+			// id from the path
+			id = path.fileNameWithoutExtension.asSymbol;
+			// make a monome device data entry. 
+			devices[id] = MonomeDevice.new;
+			devices[id].data.add('/sys/id'-> [id]);
 			// TODO: remote device support
-			devices[id].serverAddr.port = port;			file.close;			^ok		// return false if search failed		}, {			^false		// return false if no file		});	}		}
+			devices[id].serverAddr.port = port;
+			file.close;
+			^ok		// return false if search failed
+		}, {
+			^false		// return false if no file
+		});
+	}		
+}
 
 
 //------ MonomeDevice
@@ -117,6 +464,7 @@ MonomeDevice {
 	var <>serverAddr;
 	var <>connected;
 	var <>portStolen = false;
+	var <>prefixStolen = false;
 	
 	*new {
 		^super.new.init;
@@ -131,17 +479,24 @@ MonomeDevice {
 	
 	msg { arg cmd ... args;
 		data.put(cmd, args);
-		this.serverAddr.sendBundle(0.0, [data['/sys/prefix'][0].asString ++ cmd] ++ args);
+		if (MonomeProtocol.systemClientPatterns.collect({|pat|pat.key}).matchItem(cmd), {
+			this.serverAddr.sendBundle(0.0, [cmd] ++ args);
+		}, {
+			this.serverAddr.sendBundle(0.0, [data['/sys/prefix'][0].asString ++ cmd] ++ args);
+		});
 	}
 	
 	clientAddr {
 		^(NetAddr(data['/sys/host'][0],  data['/sys/port'][0]))
 	}
 	
+	id {
+		^(data['/sys/id'][0])
+	}
 }
 
 
-//------MonomeEvent
+//------s
 // helper
 MonomeEvent {
 	classvar <params;	
