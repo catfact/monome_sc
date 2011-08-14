@@ -1,4 +1,7 @@
-Monome classes for SuperCollider.
+Monome classes for SuperCollider. c
+
+classes/  - contains .sc files, must live in your SC extensions path
+examples/ - contains executable .scd code, can live anywhere you like
 
 these classes implement communication with Monome devices using the serialosc 1.0 protocol.
 
@@ -14,8 +17,6 @@ resulting in some extremely ugly code in MonomeClient methods.
 
 there is also some work to be done on robust plug-and-play methods with multiple applications and devices,
 and on support for remotely-hosted devices.
-
-documentation forthcoming...
 
 -emb, august 2011
 
