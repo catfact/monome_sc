@@ -1,0 +1,22 @@
+Monome classes for SuperCollider.
+
+these classes implement communication with Monome devices using the serialosc 1.0 protocol.
+
+the goal is to make a flexible and robust system along the lines of MIDIClient and MIDIResponder.
+
+mostly, this works.
+it is possible to create event responders matching arbitrary ports/devices/configurations/OSC patterns.
+these responders have priority ordering and event swallowing.
+the MonomeClient seems to be acceptably graceful when stealing or restoring devices from/to other apps.
+
+however, there are major snags concerning SC's and serialosc's different attitudes towards zeroconf services,
+resulting in some extremely ugly code in MonomeClient methods.
+
+there is also some work to be done on robust plug-and-play methods with multiple applications and devices,
+and on support for remotely-hosted devices.
+
+documentation forthcoming...
+
+-emb, august 2011
+
+
