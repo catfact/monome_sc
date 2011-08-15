@@ -87,11 +87,11 @@ Routine {
 		var win; 								// a window!
 		var vl, hl; 							// flow layouts
 		var wW, wH, wX=200, wY=800;				// coordinates
-		var butSyms = [\connect, \rotate];		// keys for identifying buttons
+		var butSyms = [\focus, \rotate];		// keys for identifying buttons
 		var buts = MultiLevelIdentityDictionary.new;	// tree of buttons
-		var buildConnectionWindow;	
+		
 		// function to scan devices and build the connection window:
-		buildConnectionWindow = { Routine {
+		var buildConnectionWindow = { Routine {
 					
 			// read .conf files
 			MonomeClient.scanDevices;
@@ -119,16 +119,16 @@ Routine {
 					buildConnectionWindow.value;
 				}
 			);
-			// connection and rotation buttons for each device
+			// focus and rotation buttons for each device
 			MonomeClient.getConnectedDevices.do({ arg dev;
 				hl.add(HLayoutView(vl, Rect(0, 0, wW, 50)));
 				butSyms.do({ arg sym;
 					buts.put(dev.id, sym, Button(hl.last, Rect(0, 0, 200, 50)));
 					sym.switch(
-						\connect, {
+						\focus, {
 							buts[dev.id][sym].states = [
-								["  " ++ dev.id.asString ++ " : disconnected", Color.new(0.3, 0.3, 0.3), Color.new(0.7, 0.7, 0.7)],
-								["  " ++ dev.id.asString ++ " : connected", Color.black, Color.new(0.4, 0.7, 0.5)]
+								["  " ++ dev.id.asString ++ " : unfocused", Color.new(0.3, 0.3, 0.3), Color.new(0.7, 0.7, 0.7)],
+								["  " ++ dev.id.asString ++ " : focused", Color.black, Color.new(0.4, 0.7, 0.5)]
 							];
 							buts[dev.id][sym].action = { arg but;
 								if(focusedDevices.includes(dev.id), {
@@ -161,7 +161,7 @@ Routine {
 				});
 			});
 			focusedDevices.do({ arg id;
-				buts[id][\connect].value(1);		
+				buts[id][\focus].value(1);		
 			});
 			win.onClose = {
 				focusedDevices.do({ arg id;			
@@ -182,7 +182,7 @@ Routine {
 				focusedDevices.remove(id);
 			});
 			defer {
-				buts[id][\connect].value = 0;
+				buts[id][\focus].value = 0;
 			};
 		};
 		
@@ -192,7 +192,7 @@ Routine {
 				focusedDevices.remove(id);
 			});
 			defer {
-				buts[id][\connect].value = 0;
+				buts[id][\focus].value = 0;
 			};
 		};
 		
