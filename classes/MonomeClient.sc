@@ -59,8 +59,13 @@ MonomeClient {
 		lostPrefixFunction = { arg id; postln("MonomeClient: lost prefix: "++id); };
 	}
 	
+	*scanDevices { arg doneAction, wait=0.05;
+		this.scanConfFiles;
+		this.connectAllDevices(steal:false, doneAction:doneAction, wait:wait);
+	}
+	
 	// rebuild the device list (from .conf files)
-	*scanDevices {
+	*scanConfFiles {
 		var confs;
 		devices.clear;
 		confs = Platform.case(

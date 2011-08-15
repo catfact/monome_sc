@@ -93,10 +93,8 @@ Routine {
 		// function to scan devices and build the connection window:
 		var buildConnectionWindow = { Routine {
 					
-			// read .conf files
-			MonomeClient.scanDevices;
-			// attempt to contact each device on file
-			MonomeClient.connectAllDevices(doneAction:{ init.monomeConnect.test = true; init.monomeConnect.signal; });
+			// scan active devices
+			MonomeClient.scanDevices(doneAction:{ init.monomeConnect.test = true; init.monomeConnect.signal; });
 			init.monomeConnect.test = false; init.monomeConnect.wait;
 			
 			// layout components
