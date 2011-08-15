@@ -1,4 +1,4 @@
-Monome classes for SuperCollider. c
+Monome classes for SuperCollider.
 
 classes/  - contains .sc files, must live in your SC extensions path
 examples/ - contains executable .scd code, can live anywhere you like
