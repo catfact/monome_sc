@@ -96,7 +96,7 @@ MonomeClient {
 			arg pat;
 //			devices[id].data.postln;
 			devicePinged.put(id, pat.key, false);
-			[id, devicePinged[id]].postln;
+			// [id, devicePinged[id]].postln;
 			// oneshot responder
 			osr.put(
 				id,			// this device
@@ -118,9 +118,7 @@ MonomeClient {
 							});
 						});
 						
-						
 						devicePinged.put(id, pat.key, true);
-						
 						devices[id].data[pat.key] = msg.copyRange(1, msg.size);
 						if(debug, { postln("got ping: "++ (id ++ msg)); });
 						osr[id][pat.key].remove;
@@ -142,6 +140,7 @@ MonomeClient {
 			if(pingOk, {
 				connections.put(id, \device, `(devices[id]));
 			}, {
+				
 				if (connections[id].notNil, {
 					if (connections[id][\device].notNil, {
 						connections.removeEmptyAt(id, \device);
@@ -151,6 +150,7 @@ MonomeClient {
 					});
 					connections.removeEmptyAt(id);
 				})
+				
 			});
 			if(steal, {
 				this.stealDevicePort(id);
@@ -232,8 +232,10 @@ MonomeClient {
 	
 	// reset a monome server's destination port
 	*restoreDevicePort { arg id;
-		devices[id].serverAddr.sendMsg('/sys/port', devices[id].data['savedPort']);
-		devices[id].portStolen = false;
+		if (devices[id].portStolen, {
+			devices[id].serverAddr.sendMsg('/sys/port', devices[id].data['savedPort']);
+			devices[id].portStolen = false;
+		});
 
 	}
 	// convenience: all devices
@@ -245,8 +247,10 @@ MonomeClient {
 	
 	// reset a monome server's prefix
 	*restoreDevicePrefix { arg id;
-		devices[id].serverAddr.sendMsg('/sys/prefix', devices[id].data['savedPrefix']);
-		devices[id].portStolen = false;
+		if (devices[id].prefixStolen, {
+			devices[id].serverAddr.sendMsg('/sys/prefix', devices[id].data['savedPrefix']);
+			devices[id].prefixStolen = false;
+		});
 	}
 	
 	// convenience: all devices
@@ -445,7 +449,7 @@ MonomeClient {
 	// process a .conf file
 	*prScanConfFile { arg path;
 		var file, str, i, port, id, ok;
-		path.asAbsolutePath.postln;
+//		path.asAbsolutePath.postln;
 		if  (File.exists(path.absolutePath), { 
 			file = File.new(path.asAbsolutePath, "r");
 			ok = true;

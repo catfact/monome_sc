@@ -1,3 +1,5 @@
+
+
 // SCVU 
 //
 // test of MonomeClient framework with serialosc 1.0
@@ -198,3 +200,13 @@ Routine {
 	
 }.play;
  
+ 
+/*
+// debug
+thisProcess.recvOSCfunc = { |time, addr, msg| 
+	if(msg[0] != '/status.reply' && msg[0] != '/tr') {
+		"time: % sender: %\nmessage: %\n".postf(time, addr, msg); 
+	}  
+};
+
+*/
