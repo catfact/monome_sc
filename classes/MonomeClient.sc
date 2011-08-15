@@ -96,6 +96,7 @@ MonomeClient {
 			arg pat;
 //			devices[id].data.postln;
 			devicePinged.put(id, pat.key, false);
+			[id, devicePinged[id]].postln;
 			// oneshot responder
 			osr.put(
 				id,			// this device
@@ -140,6 +141,16 @@ MonomeClient {
 			});
 			if(pingOk, {
 				connections.put(id, \device, `(devices[id]));
+			}, {
+				if (connections[id].notNil, {
+					if (connections[id][\device].notNil, {
+						connections.removeEmptyAt(id, \device);
+					});
+					if (connections[id][\responders].notNil, {
+						this.prRemoveRespondersAtDevice(id);
+					});
+					connections.removeEmptyAt(id);
+				})
 			});
 			if(steal, {
 				this.stealDevicePort(id);
@@ -433,10 +444,9 @@ MonomeClient {
 
 	// process a .conf file
 	*prScanConfFile { arg path;
-		var file;
+		var file, str, i, port, id, ok;
 		path.asAbsolutePath.postln;
 		if  (File.exists(path.absolutePath), { 
-			var str, i, port, id, ok;
 			file = File.new(path.asAbsolutePath, "r");
 			ok = true;
 			str = file.readAllString;
