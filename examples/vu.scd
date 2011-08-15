@@ -13,7 +13,7 @@
 Routine {
 	var server;			// the server!
 	var init; 			// list of init conditions
-	var trig_s,			// Synth to send amplitude
+	var trig_s;			// Synth to send amplitude
 	var trig_r;			// OSC responder to listen to it
 	var key_r;			// MonomeResponder for key presses
 	var prefix;			// app's prefix
@@ -29,17 +29,10 @@ Routine {
 	// Conditions are handy for hanging a thread while things initialize
 	init = (\monomeConnect:Condition(false), \serverBoot:Condition(false););
 	
-	// read .conf files
-	MonomeClient.scanDevices;
-	
-	// attempt to contact each device on file
-	MonomeClient.connectAllDevices(doneAction:{ init.monomeConnect.test = true; init.monomeConnect.signal; });
-	
 	// boot the local audio server
 	server = Server.local.waitForBoot { init.serverBoot.test = true; init.serverBoot.signal; };
 	
-	// wait for all the init conditions
-	init.do({ arg con; con.wait; });
+	init.serverBoot.wait;
 	
 	// define and create a  Synth that sends amplitudes
 	trig_s = SynthDef.new(\amp_sendtrig, {
@@ -50,7 +43,7 @@ Routine {
 		SendTrig.kr(pulse, id, amp);
 	}).play(server, [\attack, 0.001, \release, 2.0, \gain, (6.dbamp), \speed, 18]);
 
-	// ok, we need a data structure for the scroll; it shall be overly huge to accomodate theoretical monsternomes
+	// a data structure for the scroll; it shall be overly huge to accomodate theoretical monsternomes
 	scroll = List.fill(2048, {0});
 
 	// make an OSCresponder to listen for amplitudes, light up whatever devices are connected
@@ -94,8 +87,16 @@ Routine {
 		var wW, wH, wX=200, wY=800;				// coordinates
 		var butSyms = [\connect, \rotate];		// keys for identifying buttons
 		var buts = MultiLevelIdentityDictionary.new;	// tree of buttons
-		var buildConnectionWindow;		// function to build the gui
-		buildConnectionWindow = {
+		var buildConnectionWindow;	
+		// function to scan devices and build the connection window:
+		buildConnectionWindow = { Routine {
+					
+			// read .conf files
+			MonomeClient.scanDevices;
+			// attempt to contact each device on file
+			MonomeClient.connectAllDevices(doneAction:{ init.monomeConnect.test = true; init.monomeConnect.signal; });
+			init.monomeConnect.test = false; init.monomeConnect.wait;
+			
 			// layout components
 			hl = List.new;
 			wW = 400;
@@ -168,7 +169,7 @@ Routine {
 				});
 			};
 			win.front;
-		};
+		}.play(AppClock) };
 		
 		buildConnectionWindow.value;
 					

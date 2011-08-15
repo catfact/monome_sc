@@ -34,6 +34,7 @@ MonomeClient {
 	classvar <connections;
 	// oneshot responders for pinging
 	classvar <osr;
+	classvar <devicePinged;
 	// MonomeResponders
 	classvar <>responders;
 	// functions for dealing with port/prefix focus
@@ -50,6 +51,7 @@ MonomeClient {
 		devices = Dictionary.new;
 		connections = MultiLevelIdentityDictionary.new;
 		osr = MultiLevelIdentityDictionary.new;
+		devicePinged = MultiLevelIdentityDictionary.new;
 		responders = List.new;
 		responderCount = 0;
 		ping = false;
@@ -90,9 +92,10 @@ MonomeClient {
 	// by default, this also steals the device's port
 	*connectDevice { arg id, doneAction, wait=0.1, steal=true;
 		var addr = devices[id].serverAddr;
-		connections.put(id, \device, `(devices[id]));
 		MonomeProtocol.systemServerStatusPatterns.do({
 			arg pat;
+//			devices[id].data.postln;
+			devicePinged.put(id, pat.key, false);
 			// oneshot responder
 			osr.put(
 				id,			// this device
@@ -114,6 +117,9 @@ MonomeClient {
 							});
 						});
 						
+						
+						devicePinged.put(id, pat.key, true);
+						
 						devices[id].data[pat.key] = msg.copyRange(1, msg.size);
 						if(debug, { postln("got ping: "++ (id ++ msg)); });
 						osr[id][pat.key].remove;
@@ -130,15 +136,17 @@ MonomeClient {
 			wait.wait;
 			MonomeProtocol.systemServerStatusPatterns.do({
 				arg pat;
-				pingOk = pingOk && (devices[id].data[pat.key].notNil);
+				pingOk = pingOk && (devicePinged[id][pat.key]);
 			});
-			devices[id].connected = pingOk;
+			if(pingOk, {
+				connections.put(id, \device, `(devices[id]));
+			});
 			if(steal, {
 				this.stealDevicePort(id);
 			}, {
 				this.restoreDevicePort(id);
 			});
-			doneAction.value(id, pingOk);
+			doneAction.value(id, pingOk);		
 		}.play;
 
 	}
@@ -270,7 +278,7 @@ MonomeClient {
 	
 	*getConnectedDevices {
 		// FIXME: this returns ref's to MonomeDevices!
-		// otherwise we get the data by copy and can't affect anything!
+		// otherwise we get the data by copy and can't affect anything
 		// this is a confusing workaround and there's got to be a better way...
 	//	^(connections.collect({arg dat; dat[\device]}));
 		^(connections.collect({arg dat; dat[\device].value}));
