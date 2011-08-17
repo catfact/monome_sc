@@ -43,6 +43,9 @@ MonomeClient {
 	// runtime
 	classvar <responderCount;
 	classvar ping; // FIXME
+	// version
+	classvar <versionMajor=0;
+	classvar <versionMinor=1;
 	///// debug
 	classvar <>debug = false;
 	classvar <>dum = 0;
