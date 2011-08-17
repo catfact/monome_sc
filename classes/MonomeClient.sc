@@ -143,6 +143,7 @@ MonomeClient {
 				pingOk = pingOk && (devicePinged[id][pat.key]);
 			});
 			if(pingOk, {
+				// put a ref to the device for easier data sync
 				connections.put(id, \device, `(devices[id]));
 			}, {
 				
@@ -188,17 +189,15 @@ MonomeClient {
 	*disconnectDevice { arg id;
 		if(connections[id].notNil, {
 			// trash the OSC responders and other connection data
-			this.prRemoveRespondersForDevice(id);
+			this.prRemoveRespondersAtDevice(id);
 			connections.removeEmptyAt(id, \device);
 			this.restoreDevicePort(id);
-			this.restorePrefix(id);
-			devices[id].portStolen = false;
-			devices[id].portStolen = false;
+			this.restoreDevicePrefix(id);
 		});
 	}
 	
 	// same for all devices
-	*disconnecAllDevices {
+	*disconnectAllDevices {
 		var id;
 		devices.do({ arg dev;
 			id = dev.id;
@@ -267,7 +266,7 @@ MonomeClient {
 	
 	// send to device by ID
 	// will attempt to send to an unconnected device
-	*msgDevice { arg id, cmd ... args; 
+	*msgDevice { arg id, cmd, args;
 		if (MonomeProtocol.systemClientPatterns.collect({|pat|pat.key}).matchItem(cmd), {
 			devices[id].serverAddr.sendBundle(0.0, [cmd] ++ args);
 		}, {
@@ -377,44 +376,48 @@ MonomeClient {
 	
 	// build OSC responder list for device
 	*prAddRespondersAtDevice { arg id;
-		var addr;
+		var addr, or;
 		addr = devices[id].serverAddr;
-		MonomeProtocol.deviceServerPatterns.do({
-			arg pat;
-			var sym;
-			sym = (devices[id].data['/sys/prefix'][0].asString ++ pat.key).asSymbol;
-			// postln([pat, id, sym, devices[id], devices[id].data]);
-			connections.put(id, \responders, pat.key, 
-				OSCresponderNode(addr, sym, {
-					arg t, oscr, msg;
-					var event, ate;
-					// make an event, pass it to MonomeResponders,
-					// break if it gets eaten (returning the MonomeResponder that ate it)
-					block { |break| 
-						ate = false;
-						event = (	
-							\time	: t,
-							\id 		: id,
-							\host	: devices[id].data['/sys/host'][0],
-							\port 	: devices[id].serverAddr.port,
-							\prefix	: devices[id].data['/sys/prefix'][0],
-							\cmd		: pat.key,
-							\a		: msg[1],
-							\b		: msg[2],
-							\c		: msg[3],
-							\d		: msg[4]
-						);
-						// ("\n"++ event ++ "\n" ++ dum ++ "\n").postln; dum = dum + 1;
-						responders.collect({|dat| dat.responder}).do({ arg mrRef;
-							if (mrRef.value.active, {
-								ate = mrRef.value.respond(event);
+		
+		if(connections[id][\responders].isNil, {
+			MonomeProtocol.deviceServerPatterns.do({
+				arg pat;
+				var sym;
+				sym = (devices[id].data['/sys/prefix'][0].asString ++ pat.key).asSymbol;
+				// postln([pat, id, sym, devices[id], devices[id].data]);
+				connections.put(id, \responders, pat.key, 
+					OSCresponderNode(addr, sym, {
+						arg t, oscr, msg;
+						var event, ate;
+						// [dum, oscr.hash].postln; dum = dum+1;
+						// make an event, pass it to MonomeResponders,
+						// break if it gets eaten (returning the MonomeResponder that ate it)
+						block { |break| 
+							ate = false;
+							event = (	
+								\time	: t,
+								\id 		: id,
+								\host	: devices[id].data['/sys/host'][0],
+								\port 	: devices[id].serverAddr.port,
+								\prefix	: devices[id].data['/sys/prefix'][0],
+								\cmd		: pat.key,
+								\a		: msg[1],
+								\b		: msg[2],
+								\c		: msg[3],
+								\d		: msg[4]
+							);
+							// ("\n"++ event ++ "\n" ++ dum ++ "\n").postln; dum = dum + 1;
+							responders.collect({|dat| dat.responder}).do({ arg mrRef;
+								if (mrRef.value.active, {
+									ate = mrRef.value.respond(event);
+								});
+								if(ate, { break.value(mrRef.value); });
 							});
-							if(ate, { break.value(mrRef.value); });
-						});
-					} // block
-				}).add;
-			);
-
+						} // block
+					}).add;
+//					postln("adding " ++ or ++ ", key: "++pat.key);
+				);
+			});
 		});
 		// add special responders for port and prefix changes
 		connections.put(id, \responders, '/sys/port', 
@@ -431,7 +434,7 @@ MonomeClient {
 		connections.put(id, \responders, '/sys/prefix', 
 			OSCresponderNode(addr, '/sys/prefix', {
 				arg t, oscr, msg;
-				if(devices[id].portStolen, {
+				if(devices[id].prefixStolen, {
 					if(msg[1] != devices[id].data['/sys/prefix'][0], {
 						devices[id].prefixStolen = false;
 						this.prRemoveRespondersAtDevice(id);
@@ -444,11 +447,18 @@ MonomeClient {
 	}
 	
 	*prRemoveRespondersAtDevice { arg id;		
-		MonomeProtocol.deviceServerPatterns.do({ arg pat;
-			connections.removeEmptyAt(id, \responders, pat.key);
-		});	
-		connections.removeEmptyAt(id, \responders, '/sys/port');
-		connections.removeEmptyAt(id, \responders, '/sys/prefix');
+		if(connections[id][\responders].notNil, {
+			MonomeProtocol.deviceServerPatterns.do({ arg pat;
+				if(connections[id][\responders][pat.key].notNil, {
+					connections[id][\responders][pat.key].remove;
+					connections.removeEmptyAt(id, \responders, pat.key);
+				});
+			});	
+			connections[id][\responders]['/sys/port'].remove;
+			connections[id][\responders]['/sys/prefix'].remove;
+			connections.removeEmptyAt(id, \responders, '/sys/port');
+			connections.removeEmptyAt(id, \responders, '/sys/prefix');
+		});
 	}
 
 	// process a .conf file

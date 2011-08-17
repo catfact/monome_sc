@@ -1,14 +1,10 @@
-
-
 // SCVU 
 //
 // test of MonomeClient framework with serialosc 1.0
 //
-// a scrolling VU meter, yay!
-//
-// but really, the point is to test interactions (port stealing) with other apps,
-// so most of this is just an attempt towards sort of boilerplate monome application code.
-// stick different stuff in the SynthDef and the MonomeResponder and you're good to go...
+// this is an exaple of using the MonomeClient framework directly. 
+// it implements a scrolling audio level meter, 
+// mirrored across an arbitrary set of connected devices.
 //
 // emb@catfact.net
 
@@ -84,10 +80,10 @@ Routine {
 	//// make a gui to toggle connections and rotation
 	// (wrap GUI stuff in a function and defer to AppClock or it will hurl)
 	{
-		var win; 								// a window!
+		var win; 								// a window
 		var vl, hl; 							// flow layouts
 		var wW, wH, wX=200, wY=800;				// coordinates
-		var butSyms = [\focus, \rotate];		// keys for identifying buttons
+		var butSyms = [\focus, \rotate];			// keys for identifying buttons
 		var buts = MultiLevelIdentityDictionary.new;	// tree of buttons
 		
 		// function to scan devices and build the connection window:
@@ -206,5 +202,4 @@ thisProcess.recvOSCfunc = { |time, addr, msg|
 		"time: % sender: %\nmessage: %\n".postf(time, addr, msg); 
 	}  
 };
-
 */
