@@ -227,47 +227,11 @@ MonomeGridApp {
 							connectionView.refresh;
 						}.defer;
 					});
-
-					/*
-					MonomeClient.stealDevicePort(id, doneAction:{
-						arg id, ping;
-						if(ping, {
-							focus = v;
-						}, {
-							postln("MonomeGridApp: device ping failed after attempted port change. id: "++id++", wait:"++pingWait);
-						});
-						{ 	focusBut.value_(focus);
-//							prefixField.string_(MonomeClient.devices[id].data['/sys/prefix'][0].asString;);
-							connectionView.refresh;
-						}.defer;
-					});
-					if (prefix.notNil, {
-						MonomeClient.setDevicePrefix(id, prefix, doneAction:{
-							arg id, ping;
-							if (ping, {
-							}, {
-								postln("MonomeGridApp: device ping failed after attempted prefix change. id: "++id++", wait:"++pingWait);
-							});
-							
-							{	prefixField.string_(prefix.asString);
-								connectionView.refresh;
-							}.defer;
-						});
-					});
-					*/
 				});
 			}, {
 				if(id.notNil, {
 					MonomeClient.disconnectDevice(id);
-					
-				//	MonomeClient.restoreDevicePort(id);
-				//	MonomeClient.restoreDevicePort(id, doneAction:{
-				//		arg id, ping;
-				//		if(ping, {
 							focus = v;
-				//		}, {
-				//			postln("MonomeGridApp: device ping failed after attempted port change. id: "++id++", wait:"++pingWait);
-				//		});
 						{ 	focusBut.value_(focus);
 							connectionView.refresh;
 						}.defer;
@@ -365,50 +329,51 @@ MonomeGridApp {
 	
 	// store connection settings (including focus)
 	storeConnection {	
-		var path, file;
-		if(id.notNil, {
-			if(deviceSettingsPath.notNil, {
-				path = deviceSettingsPath;
-			}, {
-				if (name.notNil, {
-					path = name.asString ++ "_deviceSettings.dat";
-				}, {
-					path = "monomeGridApp_generic_deviceSettings.dat";
-				});
-			});
-			file = File(path, "w");
-			file.putString(id.asString ++ "\r");
-			file.putString(focus.asString ++"\r");
-			file.close;
-		});
+		postln("MonomeGridApp: store/recall functions are not quite done...");
+//		var path, file;
+//		if(id.notNil, {
+//			if(deviceSettingsPath.notNil, {
+//				path = deviceSettingsPath;
+//			}, {
+//				if (name.notNil, {
+//					path = name.asString ++ "_deviceSettings.dat";
+//				}, {
+//					path = "monomeGridApp_generic_deviceSettings.dat";
+//				});
+//			});
+//			file = File(path, "w");
+//			file.putString(id.asString ++ "\r");
+//			file.putString(focus.asString ++"\r");
+//			file.close;
+//		});
 	}
 	
 	// recall connection setting (including focus)
 	recallConnection {
-		var file, path, iId, iFocus;		
-		if(deviceSettingsPath.notNil, {
-			path = deviceSettingsPath;
-		}, {
-			if (name.notNil, {
-				path = name.asString ++ "_deviceSettings.dat";
-			}, {
-				path = "monomeGridApp_generic_deviceSettings.dat";
-			});
-		});
-		if(File.exists(path), {
-			file = File(path, "r");
-			iId = file.getLine.asSymbol;
-			iFocus = file.getLine.asInteger;
-			file.close;
-		});
-		if(id.notNil && iFocus.notNil, {
-			this.id_(iId);
-			this.focus_(iFocus);
-		}, {
-			postln("MonomeGridApp: failed to parse settings file. path: "++path);
-		});
+		postln("MonomeApp: store/recall functions are not quite done...");
+//		var file, path, iId, iFocus;		
+//		if(deviceSettingsPath.notNil, {
+//			path = deviceSettingsPath;
+//		}, {
+//			if (name.notNil, {
+//				path = name.asString ++ "_deviceSettings.dat";
+//			}, {
+//				path = "monomeGridApp_generic_deviceSettings.dat";
+//			});
+//		});
+//		if(File.exists(path), {
+//			file = File(path, "r");
+//			iId = file.getLine.asSymbol;
+//			iFocus = file.getLine.asInteger;
+//			file.close;
+//		});
+//		if(id.notNil && iFocus.notNil, {
+//			this.id_(iId);
+//			this.focus_(iFocus);
+//		}, {
+//			postln("MonomeGridApp: failed to parse settings file. path: "++path);
+//		});
 	}
-
 }
 
 
