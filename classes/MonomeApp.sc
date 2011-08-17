@@ -341,9 +341,10 @@ MonomeGridApp {
 					path = "monomeGridApp_generic_deviceSettings.dat";
 				});
 			});
+//			[id, focus, path].postln;
 			file = File(path, "w");
-			file.putString(id.asString ++ "\r");
-			file.putString(focus.asString ++"\r");
+			file.write(id.asString ++ "\n");
+			file.write(focus.asString ++ "\n");
 			file.close;
 		});
 	}
@@ -364,10 +365,12 @@ MonomeGridApp {
 		if(File.exists(path), {
 			file = File(path, "r");
 			iId = file.getLine.asSymbol;
+			
 			iFocus = file.getLine.asInteger;
+			[iId, iFocus].postln;
 			file.close;
 		});
-		if(id.notNil && iFocus.notNil, {
+		if(iId.notNil && iFocus.notNil, {
 			this.id_(iId);
 			this.focus_(iFocus);
 		}, {
