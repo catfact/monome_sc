@@ -329,50 +329,50 @@ MonomeGridApp {
 	
 	// store connection settings (including focus)
 	storeConnection {	
-		postln("MonomeGridApp: store/recall functions are not quite done...");
-//		var path, file;
-//		if(id.notNil, {
-//			if(deviceSettingsPath.notNil, {
-//				path = deviceSettingsPath;
-//			}, {
-//				if (name.notNil, {
-//					path = name.asString ++ "_deviceSettings.dat";
-//				}, {
-//					path = "monomeGridApp_generic_deviceSettings.dat";
-//				});
-//			});
-//			file = File(path, "w");
-//			file.putString(id.asString ++ "\r");
-//			file.putString(focus.asString ++"\r");
-//			file.close;
-//		});
+		//postln("MonomeGridApp: store/recall functions are not quite done...");
+		var path, file;
+		if(id.notNil, {
+			if(deviceSettingsPath.notNil, {
+				path = deviceSettingsPath;
+			}, {
+				if (name.notNil, {
+					path = name.asString ++ "_deviceSettings.dat";
+				}, {
+					path = "monomeGridApp_generic_deviceSettings.dat";
+				});
+			});
+			file = File(path, "w");
+			file.putString(id.asString ++ "\r");
+			file.putString(focus.asString ++"\r");
+			file.close;
+		});
 	}
 	
 	// recall connection setting (including focus)
 	recallConnection {
-		postln("MonomeApp: store/recall functions are not quite done...");
-//		var file, path, iId, iFocus;		
-//		if(deviceSettingsPath.notNil, {
-//			path = deviceSettingsPath;
-//		}, {
-//			if (name.notNil, {
-//				path = name.asString ++ "_deviceSettings.dat";
-//			}, {
-//				path = "monomeGridApp_generic_deviceSettings.dat";
-//			});
-//		});
-//		if(File.exists(path), {
-//			file = File(path, "r");
-//			iId = file.getLine.asSymbol;
-//			iFocus = file.getLine.asInteger;
-//			file.close;
-//		});
-//		if(id.notNil && iFocus.notNil, {
-//			this.id_(iId);
-//			this.focus_(iFocus);
-//		}, {
-//			postln("MonomeGridApp: failed to parse settings file. path: "++path);
-//		});
+		//postln("MonomeGridApp: store/recall functions are not quite done...");
+		var file, path, iId, iFocus;		
+		if(deviceSettingsPath.notNil, {
+			path = deviceSettingsPath;
+		}, {
+			if (name.notNil, {
+				path = name.asString ++ "_deviceSettings.dat";
+			}, {
+				path = "monomeGridApp_generic_deviceSettings.dat";
+			});
+		});
+		if(File.exists(path), {
+			file = File(path, "r");
+			iId = file.getLine.asSymbol;
+			iFocus = file.getLine.asInteger;
+			file.close;
+		});
+		if(id.notNil && iFocus.notNil, {
+			this.id_(iId);
+			this.focus_(iFocus);
+		}, {
+			postln("MonomeGridApp: failed to parse settings file. path: "++path);
+		});
 	}
 }
 

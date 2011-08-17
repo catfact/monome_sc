@@ -39,7 +39,6 @@
 	
 	monomeInitAction:{ arg app;
 		app.ctx.toggle = false;
-		app.ctx.what = 0;
 		app.ctx.keyResponder = MonomeResponder.new(
 			filter:(
 				\id:{arg id; id.asSymbol == app.id.asSymbol},
@@ -48,8 +47,6 @@
 			function:{ arg r, e;
 				//e.postln;
 				if(app.ctx.toggle, {
-					app.ctx.what = app.ctx.what + 1;
-					app.ctx.what.postln;
 					if (e.c > 0, {
 						app.ctx.gridView.gridState[e.a][e.b] = 1 - app.ctx.gridView.gridState[e.a][e.b];
 						{ app.ctx.gridView.refresh; }.defer;
