@@ -328,7 +328,9 @@ MonomeGridApp {
 	
 	// convenience 
 	msg { arg cmd, args;
-		MonomeClient.msgDevice(id, cmd, args);
+		if(id.notNil, {
+			MonomeClient.msgDevice(id, cmd, args);
+		});
 	}
 	
 	// store connection settings (including focus)
