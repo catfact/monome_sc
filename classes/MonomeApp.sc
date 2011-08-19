@@ -2,6 +2,8 @@
 
 // classes to simplify monome application development using MonomeClient
 
+/// TODO: transparent offset support
+
 
 // ----- MonomeGridApp
 // boilerplate for the case of an application using a single grid device
@@ -181,7 +183,7 @@ MonomeGridApp {
 	rescanDevices {
 		MonomeClient.scanDevices(doneAction:{
 			defer {
-				deviceMenu.postln;
+				// deviceMenu.postln;
 				deviceMenu.items_(MonomeClient.getConnectedDevices.collect({ arg dev; dev.id.asSymbol }));
 				if (id.notNil, {
 					prefixField.string_(MonomeClient.devices[id].data['/sys/prefix'][0].asString);
@@ -219,11 +221,13 @@ MonomeGridApp {
 						arg id, ping;
 						if(ping, {
 							focus = v;
+							MonomeClient.setDevicePrefix(id, prefix, doneAction:{
+								{ prefixField.string_(MonomeClient.devices[id].data['/sys/prefix'][0].asString;); }.defer;
+							});
 						}, {
 							postln("MonomeGridApp: device ping failed after attempted connection. id: "++id++", wait:"++pingWait);
 						});
 						{ 	focusBut.value_(focus);
-							prefixField.string_(MonomeClient.devices[id].data['/sys/prefix'][0].asString;);
 							connectionView.refresh;
 						}.defer;
 					});
@@ -258,7 +262,7 @@ MonomeGridApp {
 			}, {
 				id=v;
 			});
-			deviceMenu.value_(deviceMenu.items.indexOf(v.asSymbol));
+			{ deviceMenu.value_(deviceMenu.items.indexOf(v.asSymbol)); }.defer;
 			size = MonomeClient.devices[id].data['/sys/size'];
 			if( (size[0].notNil) && (size[0] != width)
 				|| (size[1].notNil) && (size[1] != height),
@@ -351,7 +355,6 @@ MonomeGridApp {
 	
 	// recall connection setting (including focus)
 	recallConnection {
-		//postln("MonomeGridApp: store/recall functions are not quite done...");
 		var file, path, iId, iFocus;		
 		if(deviceSettingsPath.notNil, {
 			path = deviceSettingsPath;
@@ -367,7 +370,7 @@ MonomeGridApp {
 			iId = file.getLine.asSymbol;
 			
 			iFocus = file.getLine.asInteger;
-			[iId, iFocus].postln;
+//			[iId, iFocus].postln;
 			file.close;
 		});
 		if(iId.notNil && iFocus.notNil, {
@@ -375,6 +378,37 @@ MonomeGridApp {
 			this.focus_(iFocus);
 		}, {
 			postln("MonomeGridApp: failed to parse settings file. path: "++path);
+		});
+	}
+	
+	// convenience methods to convert between local coordinates (with offset) and device coordinates.
+	// returns nil for any out-of-bounds dimension.
+	getLocalCoordinates { arg devX, devY;
+		var x, y;
+		x = devX - xOffset;
+		y = devY - xOffset;
+		if ((x<0) || (x > (width-1)), { x = nil;});
+		if ((y<0) || (y > (height-1)), { y = nil;});
+		^[x, y]
+	}
+	
+	getDeviceCoordinates { arg localX, localY;
+		var x, y, datSize;
+		x = localX + xOffset;
+		y = localY + xOffset;
+		if(id.notNil, {
+			datSize = MonomeClient.devices[id].data['/sys/size'];
+			if(datSize.notNil, {
+				if (x > (datSize[0] - 1), { x = nil; });
+				if (y > (datSize[1] - 1), { y = nil; });
+				^[x, y]
+			}, {
+				postln("MonomeGridApp: couldn't find device size data when converting coordinates, id: "++id);
+				^[nil, nil]
+			});
+		}, {
+			postln("MonomeGridApp: converting to device coordinates, but no device is set.");
+			^[nil, nil]
 		});
 	}
 }

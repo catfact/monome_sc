@@ -149,7 +149,6 @@ MonomeClient {
 				// put a ref to the device for easier data sync
 				connections.put(id, \device, `(devices[id]));
 			}, {
-				
 				if (connections[id].notNil, {
 					if (connections[id][\device].notNil, {
 						connections.removeEmptyAt(id, \device);

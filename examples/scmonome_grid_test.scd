@@ -1,6 +1,6 @@
 // scmonome_grid_test
 //
-// test application using the MonomeGridApp boilerplate class in a generic fashion.
+// test application using the MonomeGridApp template class in a generic fashion.
 
 ~testApp = MonomeGridApp.new(
 	name:"scmonome_grid_test",
