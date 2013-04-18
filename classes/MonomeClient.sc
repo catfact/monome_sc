@@ -73,7 +73,7 @@ MonomeClient {
 		devices.clear;
 		confs = Platform.case(
 			\osx, { PathName.new("~/Library/Preferences/org.monome.serialosc/").files },
-			\linux, { PathName.new("~/.conf/serialosc/").files },
+			\linux, { PathName.new("~/.config/serialosc/").files },
 			\windows, { "TODO: windows .conf location".postln; nil } 
 		);
 		confs.do({ arg path; this.prScanConfFile(path) });
@@ -88,7 +88,7 @@ MonomeClient {
 		devices.clear;
 		path = PathName(Platform.case(
 			\osx, { "~/Library/Preferences/org.monome.serialosc/" },
-			\linux, { "~/.conf/serialosc/" },
+			\linux, { "~/.config/serialosc/" },
 			\windows, { "TODO: windows .conf location".postln; nil } 
 		) ++ id ++ ".conf");
 		
